@@ -22,39 +22,48 @@
     <h1><i class="far fa-compass"></i> MPU6050 <i class="far fa-compass"></i></h1>
   </div>
   <div class="content">
-    <div class="cards">
-      <div class="card">
-        <p class="card-title">GYROSCOPE</p>
-        <p><span class="reading">X: <span id="gyroX"></span> rad</span></p>
-        <p><span class="reading">Y: <span id="gyroY"></span> rad</span></p>
-        <p><span class="reading">Z: <span id="gyroZ"></span> rad</span></p>
-      </div>
-      <div class="card">
-        <p class="card-title">ACCELEROMETER</p>
-        <p><span class="reading">X: <span id="accX"></span> ms<sup>2</sup></span></p>
-        <p><span class="reading">Y: <span id="accY"></span> ms<sup>2</sup></span></p>
-        <p><span class="reading">Z: <span id="accZ"></span> ms<sup>2</sup></span></p>
-      </div>
-      <div class="card">
-        <!-- <p class="card-title">TEMPERATURE</p>
-        <p><span class="reading"><span id="temp"></span> &deg;C</span></p> -->
-        <p class="card-title">3D ANIMATION</p>
-        <button id="reset" onclick="resetPosition(this)">RESET POSITION</button>
-        <button id="resetX" onclick="resetPosition(this)">X</button>
-        <button id="resetY" onclick="resetPosition(this)">Y</button>
-        <button id="resetZ" onclick="resetPosition(this)">Z</button>
-      </div>
-      <div class="card">
-        <p class="card-title">FORCE SENSOR</p>
-        <p><span class="reading">1: <span id="fsrpin1"></span></span></p>
-        <p><span class="reading">2: <span id="fsrpin2"></span></span></p>
-        <p><span class="reading">3: <span id="fsrpin3"></span></span></p>
-      </div>
+    <div class="left">
+
     </div>
-    <div class="cube-content">
-      <div id="3Dcube"></div>
+    <div class="right">
+      <div class="top-title">
+        <div class="lang">Language</div>
+      </div>
+      <div class="cards">
+        <div class="card">
+          <p class="card-title">GYROSCOPE</p>
+          <p><span class="reading">X: <span id="gyroX"></span> rad</span></p>
+          <p><span class="reading">Y: <span id="gyroY"></span> rad</span></p>
+          <p><span class="reading">Z: <span id="gyroZ"></span> rad</span></p>
+        </div>
+        <div class="card">
+          <p class="card-title">ACCELEROMETER</p>
+          <p><span class="reading">X: <span id="accX"></span> ms<sup>2</sup></span></p>
+          <p><span class="reading">Y: <span id="accY"></span> ms<sup>2</sup></span></p>
+          <p><span class="reading">Z: <span id="accZ"></span> ms<sup>2</sup></span></p>
+        </div>
+        <div class="card">
+          <!-- <p class="card-title">TEMPERATURE</p>
+          <p><span class="reading"><span id="temp"></span> &deg;C</span></p> -->
+          <p class="card-title">3D ANIMATION</p>
+          <button id="reset" onclick="resetPosition(this)">RESET POSITION</button>
+          <button id="resetX" onclick="resetPosition(this)">X</button>
+          <button id="resetY" onclick="resetPosition(this)">Y</button>
+          <button id="resetZ" onclick="resetPosition(this)">Z</button>
+        </div>
+        <div class="card">
+          <p class="card-title">FORCE SENSOR</p>
+          <p><span class="reading">1: <span id="fsrpin1"></span></span></p>
+          <p><span class="reading">2: <span id="fsrpin2"></span></span></p>
+          <p><span class="reading">3: <span id="fsrpin3"></span></span></p>
+        </div>
+      </div>
+      <div class="cube-content">
+        <div id="3Dcube"></div>
+      </div>
     </div>
   </div>
 <script src="script.js"></script>
+<script src="imu.js"></script>
 </body>
 </html>

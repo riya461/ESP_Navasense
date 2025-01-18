@@ -31,13 +31,11 @@ JSONVar readings;
 
 // Timer variables
 unsigned long lastTime = 0;  
-unsigned long lastTimeTemperature = 0;
 unsigned long lastTimeAcc = 0;
 unsigned long lastTimeForce = 0; // New timer for force sensor data
-unsigned long gyroDelay = 10;
-unsigned long temperatureDelay = 1000;
-unsigned long accelerometerDelay = 200;
-unsigned long forceSensorDelay = 500; // Update rate for force sensor data
+unsigned long gyroDelay = 100;
+unsigned long accelerometerDelay = 100;
+unsigned long forceSensorDelay = 50; // Update rate for force sensor data
 
 // Create a sensor object
 Adafruit_MPU6050 mpu;
@@ -46,16 +44,8 @@ sensors_event_t a, g, temp;
 
 float gyroX, gyroY, gyroZ;
 float accX, accY, accZ;
-float temperature;
 
-// Accelerometer sensor deviation
-float accXerror = 1.5;
-float accYerror = 1.5;
-float accZerror = 1.5;
-//Gyroscope sensor deviation
-float gyroXerror = 0.1;
-float gyroYerror = 0.4;
-float gyroZerror = 0.1;
+
 
 // Init MPU6050
 void initMPU(){
@@ -92,20 +82,14 @@ void initWiFi() {
 String getGyroReadings(){
   mpu.getEvent(&a, &g, &temp);
 
-  float gyroX_temp = g.gyro.x;
-  if(abs(gyroX_temp) > gyroXerror )  {
-    gyroX += gyroX_temp/50.00;
-  }
   
-  float gyroY_temp = g.gyro.y;
-  if(abs(gyroY_temp) > gyroYerror  ) {
-    gyroY += gyroY_temp/70.00;
-  }
-
-  float gyroZ_temp = g.gyro.z;
-  if(abs(gyroZ_temp) > gyroZerror  ) {
-    gyroZ += gyroZ_temp/90.00;
-  }
+  gyroX = g.gyro.x;
+  
+  
+  gyroY = g.gyro.y;
+  
+  gyroZ = g.gyro.z;
+  
 
   readings["gyroX"] = String(gyroX);
   readings["gyroY"] = String(gyroY);
