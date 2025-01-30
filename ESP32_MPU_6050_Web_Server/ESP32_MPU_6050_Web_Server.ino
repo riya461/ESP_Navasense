@@ -17,8 +17,8 @@
 #define fsrpin3 32 // ESP32 pin GPIO32 (ADC2)
 
 // Replace with your network credentials
-const char* ssid = "Uio";
-const char* password = "0nnm7q8h";
+const char* ssid = "name";
+const char* password = "password";
 
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
