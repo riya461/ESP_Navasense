@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Bilingual Editor</title>
+    <style>
+        :root {
+            --primary-color: #4361ee;
+            --success-color: #2ecc71;
+            --error-color: #e74c3c;
+            --text-color: #2d3436;
+            --light-gray: #f5f6fa;
+            --medium-gray: #dfe6e9;
+            --dark-gray: #636e72;
+        }
+        
+        body {
+            font-family: 'Noto Sans', 'Noto Sans Malayalam', 'Arial', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: var(--light-gray);
+            color: var(--text-color);
+            line-height: 1.6;
+        }
+        
+        #app-container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            overflow: hidden;
+            height: 90vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        #editor {
+            flex: 1;
+            padding: 25px;
+            font-size: 18px;
+            line-height: 1.8;
+            border: none;
+            outline: none;
+            resize: none;
+            background-color: white;
+            overflow-y: auto;
+        }
+        
+        #status-bar {
+            padding: 12px 25px;
+            background-color: #f8f9fa;
+            border-top: 1px solid var(--medium-gray);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 14px;
+        }
+        
+        #status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        #status-icon {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: var(--medium-gray);
+        }
+        
+        #status.processing #status-icon {
+            background-color: var(--primary-color);
+            animation: pulse 1.5s infinite;
+        }
+        
+        #status.error #status-icon {
+            background-color: var(--error-color);
+        }
+        
+        #status.success #status-icon {
+            background-color: var(--success-color);
+        }
+        
+        #status-text {
+            flex: 1;
+        }
+        
+        #model-info {
+            color: var(--dark-gray);
+            font-size: 13px;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+        
+        @keyframes dots {
+            0%, 20% { opacity: 0; }
+            40% { opacity: 1; }
+            60%, 100% { opacity: 1; }
+        }
+        
+        .suggestion {
+            position: absolute;
+            background: white;
+            border: 1px solid var(--medium-gray);
+            border-radius: 8px;
+            box-shadow: 0 6px 18px rgba(0,0,0,0.1);
+            z-index: 1000;
+            font-size: 16px;
+            max-width: 300px;
+            transform: translateY(10px);
+            opacity: 0;
+            transition: all 0.2s ease;
+            pointer-events: none;
+        }
+        
+        .suggestion.visible {
+            opacity: 1;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+        
+        .suggestion-item {
+            padding: 10px 16px;
+            cursor: pointer;
+            border-bottom: 1px solid #f1f2f6;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+        
+        .suggestion-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .word-change {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .original-word {
+            color: var(--error-color);
+            text-decoration: line-through;
+        }
+        
+        .arrow {
+            color: var(--dark-gray);
+        }
+        
+        .corrected-word {
+            color: var(--success-color);
+            font-weight: 500;
+        }
+        
+        .ignore-btn {
+            color: var(--dark-gray);
+            font-size: 14px;
+        }
+        
+        .loading-dots:after {
+            content: '...';
+            display: inline-block;
+            width: 20px;
+            animation: dots 1.5s steps(5, end) infinite;
+        }
+    </style>
+</head>
+<body>
+    <div id="app-container">
+        <div id="editor" contenteditable="true" spellcheck="false" placeholder="Type here..."></div>
+        <div id="status-bar">
+            <div id="status">
+                <div id="status-icon"></div>
+                <div id="status-text">Ready</div>
+            </div>
+            <div id="model-info">Mistral LLM • Port 11434</div>
+        </div>
+    </div>
+
+    <div id="suggestion" class="suggestion"></div>
+
+    <script>
+        // DOM Elements
+        const editor = document.getElementById('editor');
+        const status = document.getElementById('status');
+        const statusText = document.getElementById('status-text');
+        const statusIcon = document.getElementById('status-icon');
+        const suggestionBox = document.getElementById('suggestion');
+        
+        // State
+        let lastProcessedWord = '';
+        let isProcessing = false;
+        let currentSelection = null;
+        
+        // Event Listeners
+        editor.addEventListener('input', handleInput);
+        editor.addEventListener('keydown', handleKeyDown);
+        editor.addEventListener('click', hideSuggestion);
+        document.addEventListener('click', (e) => {
+            if (!suggestionBox.contains(e.target)) {
+                hideSuggestion();
+            }
+        });
+        
+        // Main Input Handler
+        async function handleInput() {
+            if (isProcessing) return;
+            
+            const { word, context, start, end } = getCurrentWordAndContext();
+            
+            // Skip if word is empty, same as last processed, or just punctuation
+            if (!word || word === lastProcessedWord || /^[\s\.,!?]+$/.test(word)) {
+                return;
+            }
+            
+            lastProcessedWord = word;
+            isProcessing = true;
+            currentSelection = { start, end };
+            updateStatus('Checking word', true);
+            hideSuggestion();
+            
+            try {
+                const corrected = await window.electronAPI.correctWord(word, context);
+                
+                if (corrected && corrected !== word) {
+                    showSuggestion(word, corrected);
+                    updateStatus('Suggestion available', false, 'success');
+                } else {
+                    updateStatus('No suggestions', false, 'success');
+                }
+            } catch (error) {
+                console.error('Correction error:', error);
+                updateStatus(error.message || 'Correction failed', false, 'error');
+                setTimeout(() => updateStatus('Ready', false), 3000);
+            } finally {
+                isProcessing = false;
+            }
+        }
+        
+        // Handle key events
+        function handleKeyDown(e) {
+            if (e.key === 'Escape') {
+                hideSuggestion();
+            } else if (e.key === 'Enter' && suggestionBox.classList.contains('visible')) {
+                e.preventDefault();
+                const firstSuggestion = suggestionBox.querySelector('.suggestion-item');
+                if (firstSuggestion) firstSuggestion.click();
+            }
+        }
+        
+        // Status updates
+        function updateStatus(message, isProcessing, type = '') {
+            statusText.textContent = message;
+            status.className = '';
+            
+            if (isProcessing) {
+                status.classList.add('processing');
+                statusText.innerHTML = message + '<span class="loading-dots"></span>';
+            } else if (type === 'error') {
+                status.classList.add('error');
+            } else if (type === 'success') {
+                status.classList.add('success');
+            }
+        }
+        
+        // Show suggestion box
+        function showSuggestion(original, corrected) {
+            suggestionBox.innerHTML = `
+                <div class="suggestion-item" data-action="replace">
+                    <div class="word-change">
+                        <span class="original-word">${original}</span>
+                        <span class="arrow">→</span>
+                        <span class="corrected-word">${corrected}</span>
+                    </div>
+                </div>
+                <div class="suggestion-item" data-action="ignore">
+                    <span class="ignore-btn">Keep original</span>
+                </div>
+            `;
+            
+            positionSuggestionBox();
+            suggestionBox.classList.add('visible');
+            
+            // Add event listeners to suggestion items
+            suggestionBox.querySelectorAll('.suggestion-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    if (item.dataset.action === 'replace') {
+                        applyCorrection(original, corrected);
+                    }
+                    hideSuggestion();
+                    updateStatus('Correction applied', false, 'success');
+                    setTimeout(() => updateStatus('Ready', false), 2000);
+                });
+            });
+        }
+        
+        // Hide suggestion box
+        function hideSuggestion() {
+            suggestionBox.classList.remove('visible');
+        }
+        
+        // Position suggestion box near cursor
+        function positionSuggestionBox() {
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return;
+            
+            const range = selection.getRangeAt(0).cloneRange();
+            range.collapse(false);
+            const rect = range.getBoundingClientRect();
+            
+            suggestionBox.style.top = `${rect.bottom + window.scrollY + 8}px`;
+            suggestionBox.style.left = `${rect.left + window.scrollX}px`;
+        }
+        
+        // Apply correction to the text
+        function applyCorrection(original, corrected) {
+            if (!currentSelection) return;
+            
+            const text = editor.textContent || editor.innerText;
+            const before = text.substring(0, currentSelection.start);
+            const after = text.substring(currentSelection.end);
+            
+            editor.textContent = before + corrected + after;
+            
+            // Move cursor to end of corrected word
+            setCaretPosition(editor, currentSelection.start + corrected.length);
+        }
+        
+        // Helper function to get current word and context
+        function getCurrentWordAndContext() {
+            const text = editor.textContent || editor.innerText;
+            const cursorPos = getCaretPosition(editor);
+            
+            // Get current word boundaries
+            let start = cursorPos;
+            let end = cursorPos;
+            
+            while (start > 0 && !isWordBoundary(text[start - 1])) {
+                start--;
+            }
+            
+            while (end < text.length && !isWordBoundary(text[end])) {
+                end++;
+            }
+            
+            const word = text.substring(start, end);
+            
+            // Get context (50 characters before and after)
+            const contextStart = Math.max(0, start - 50);
+            const contextEnd = Math.min(text.length, end + 50);
+            const context = text.substring(contextStart, contextEnd);
+            
+            return { word, context, start, end };
+        }
+        
+        // Helper to check for word boundaries
+        function isWordBoundary(char) {
+            return /\s|,|\.|!|\?|;|:|\-|\(|\)|\[|\]|\{|\}/.test(char);
+        }
+        
+        // Helper functions for cursor position
+        function getCaretPosition(editableDiv) {
+            let position = 0;
+            const selection = window.getSelection();
+            
+            if (selection.rangeCount > 0) {
+                const range = selection.getRangeAt(0);
+                const preRange = document.createRange();
+                preRange.selectNodeContents(editableDiv);
+                preRange.setEnd(range.startContainer, range.startOffset);
+                position = preRange.toString().length;
+            }
+            
+            return position;
+        }
+        
+        function setCaretPosition(editableDiv, position) {
+            let charCount = 0;
+            const range = document.createRange();
+            range.setStart(editableDiv, 0);
+            range.collapse(true);
+            
+            const nodeStack = [editableDiv];
+            let node;
+            let foundStart = false;
+            let stop = false;
+            
+            while (!stop && (node = nodeStack.pop())) {
+                if (node.nodeType === 3) {
+                    const nextCharCount = charCount + node.length;
+                    
+                    if (!foundStart && position >= charCount && position <= nextCharCount) {
+                        range.setStart(node, position - charCount);
+                        foundStart = true;
+                    }
+                    
+                    if (foundStart && position >= charCount && position <= nextCharCount) {
+                        range.setEnd(node, position - charCount);
+                        stop = true;
+                    }
+                    
+                    charCount = nextCharCount;
+                } else {
+                    let i = node.childNodes.length;
+                    while (i--) {
+                        nodeStack.push(node.childNodes[i]);
+                    }
+                }
+            }
+            
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+        }
+    </script>
+</body>
+</html>
