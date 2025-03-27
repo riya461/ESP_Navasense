@@ -12,13 +12,10 @@
 #include <Arduino_JSON.h>
 #include "LittleFS.h"
 
-#define fsrpin1 34 // ESP32 pin GPIO34 (ADC0)
-#define fsrpin2 35 // ESP32 pin GPIO35 (ADC1)
-#define fsrpin3 32 // ESP32 pin GPIO32 (ADC2)
 
 // Replace with your network credentials
-const char* ssid = "name";
-const char* password = "password";
+const char* ssid = "Astraa 1st Floor";
+const char* password = "Astraa123";
 
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
@@ -32,10 +29,9 @@ JSONVar readings;
 // Timer variables
 unsigned long lastTime = 0;  
 unsigned long lastTimeAcc = 0;
-unsigned long lastTimeForce = 0; // New timer for force sensor data
+
 unsigned long gyroDelay = 100;
 unsigned long accelerometerDelay = 100;
-unsigned long forceSensorDelay = 50; // Update rate for force sensor data
 
 // Create a sensor object
 Adafruit_MPU6050 mpu;
@@ -111,17 +107,6 @@ String getAccReadings() {
   return JSON.stringify(readings);
 }
 
-String getForceSensorReadings() {
-  int fsrreading1 = analogRead(fsrpin1);
-  int fsrreading2 = analogRead(fsrpin2);
-  int fsrreading3 = analogRead(fsrpin3);
-
-  readings["fsrpin1"] = String(fsrreading1);
-  readings["fsrpin2"] = String(fsrreading2);
-  readings["fsrpin3"] = String(fsrreading3);
-
-  return JSON.stringify(readings);
-}
 
 void setup() {
   Serial.begin(115200);
@@ -150,17 +135,14 @@ void setup() {
 }
 
 void loop() {
-  if ((millis() - lastTime) > gyroDelay) {
+  // if ((millis() - lastTime) > gyroDelay) {
     events.send(getGyroReadings().c_str(), "gyro_readings", millis());
-    lastTime = millis();
-  }
-  if ((millis() - lastTimeAcc) > accelerometerDelay) {
+    // lastTime = millis();
+  // }
+  // if ((millis() - lastTimeAcc) > accelerometerDelay) {
     events.send(getAccReadings().c_str(), "accelerometer_readings", millis());
-    lastTimeAcc = millis();
-  }
-  if ((millis() - lastTimeForce) > forceSensorDelay) {
-    events.send(getForceSensorReadings().c_str(), "forces_readings", millis());
-    lastTimeForce = millis();
-  }
+    // lastTimeAcc = millis();
+  // }
+  
   // delay(10);
 }

@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Lined Paper Drawing Pad</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #f9f9f9;
+        }
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        #linedBackground {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #fff;
+            background-image: linear-gradient(#eee .1em, transparent .1em);
+            background-size: 100% 1.2em;
+            z-index: 0;
+        }
+        #drawingCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        #status {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-family: Arial, sans-serif;
+            z-index: 2;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="linedBackground"></div>
+        <canvas id="drawingCanvas"></canvas>
+        <div id="status">Mode: Mouse (Press Ctrl+X for Drawing, Ctrl+Y for Mouse)</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('drawingCanvas');
+        const ctx = canvas.getContext('2d');
+        const statusDiv = document.getElementById('status');
+        
+        // Set canvas to full window size
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            drawLinedBackground();
+        }
+        
+        // Draw lined background (for canvas version - optional)
+        function drawLinedBackground() {
+            // This is optional since we're using CSS for the background
+            // Keeping it in case you want to export the drawing with lines
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.strokeStyle = '#eeeeee';
+            ctx.lineWidth = 1;
+            
+            const lineHeight = 24;
+            const totalLines = Math.floor(canvas.height / lineHeight);
+            
+            for (let i = 0; i < totalLines; i++) {
+                const y = i * lineHeight;
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+        }
+        
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+        
+        let isDrawingMode = false;
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        
+        // Drawing functions
+        function startDrawing(e) {
+            if (!isDrawingMode) return;
+            
+            isDrawing = true;
+            [lastX, lastY] = getPosition(e);
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(lastX, lastY);
+            ctx.stroke();
+            
+            canvas.style.cursor = 'crosshair';
+        }
+        
+        function draw(e) {
+            if (!isDrawingMode) return;
+            
+            const [x, y] = getPosition(e);
+            
+            if (!isDrawing) {
+                // Start a new path if we weren't already drawing
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                isDrawing = true;
+            }
+            
+            ctx.lineTo(x, y);
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 2;
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            
+            lastX = x;
+            lastY = y;
+        }
+        
+        function stopDrawing() {
+            isDrawing = false;
+            canvas.style.cursor = isDrawingMode ? 'crosshair' : 'default';
+        }
+        
+        function getPosition(e) {
+            return [
+                e.clientX || e.touches?.[0].clientX,
+                e.clientY || e.touches?.[0].clientY
+            ];
+        }
+        
+        // Event listeners for drawing
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseout', stopDrawing);
+        
+        // Handle touch events for mobile
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            startDrawing(e.touches[0]);
+        });
+        
+        canvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            draw(e.touches[0]);
+        });
+        
+        canvas.addEventListener('touchend', stopDrawing);
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key.toLowerCase() === 'x') {
+                isDrawingMode = true;
+                statusDiv.textContent = 'Mode: Drawing (Press Ctrl+Y for Mouse)';
+                canvas.style.cursor = 'crosshair';
+                e.preventDefault();
+            }
+            
+            if (e.ctrlKey && e.key.toLowerCase() === 'y') {
+                isDrawingMode = false;
+                isDrawing = false;
+                statusDiv.textContent = 'Mode: Mouse (Press Ctrl+X for Drawing)';
+                canvas.style.cursor = 'default';
+                e.preventDefault();
+            }
+            
+            // Clear canvas with Ctrl+C (keeps the lined background)
+            if (e.ctrlKey && e.key.toLowerCase() === 'c') {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                e.preventDefault();
+            }
+        });
+    </script>
+</body>
+</html>
+
