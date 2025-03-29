@@ -4,7 +4,7 @@ const axios = require('axios');
 const { exec } = require('child_process');
 const kill = require('tree-kill');
 
-const OLLAMA_PORT = 11434;
+// const OLLAMA_PORT = 11434;
 let mainWindow;
 let ollamaProcess;
 
@@ -37,12 +37,26 @@ async function startOllama() {
   });
 }
 
-async function correctWord(word, context) {
+async function correctWord(word) {
+  console.log('Correcting word:', word);
   try {
     const response = await axios.post(`http://127.0.0.1:11434/api/generate`, {
-      model: 'mistral',
-      prompt: `Correct this word: "${word}" in context: "${context}". Reply only with the corrected word.`,
-      options: { temperature: 0.1 },
+      model: 'llama3',
+      prompt: `Correct this word: "${word}". The corrected word can be in Malayalam or English. If the input word exists return that, if no suggestions return the same word. Reply only with the corrected word no explanation of suggestion or anything.
+      Don't add any extra characters or words. Don't add any extra spaces or new lines. Don't add any quotes. Don't add any punctuation marks. Don't add any emojis. Don't add anything else. Don't hallucinate.
+      Example: 
+      Input: hell0
+      Output: hello
+      
+      Input: hello
+      Output: hello
+      
+      Input: മലയാള0
+      Output: മലയാളം
+      
+      Input: holp
+      Output: help`,
+      
       stream: false
     }, { timeout: 30000 });
 
@@ -63,9 +77,10 @@ function createWindow() {
     }
   });
 
-  ipcMain.handle('correct-word', async (_, { word, context }) => {
+  ipcMain.handle('correctword', async (_, { word }) => {
     try {
-      return await correctWord(word, context);
+      console.log('Received word for correction:', word);
+      return await correctWord(word);
     } catch (error) {
       throw new Error('Word correction failed. Ensure Ollama is running.');
     }
@@ -92,3 +107,4 @@ app.on('window-all-closed', () => {
 process.on('SIGTERM', () => {
   if (ollamaProcess?.pid) kill(ollamaProcess.pid);
 });
+
