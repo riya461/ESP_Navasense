@@ -32,6 +32,7 @@ document.addEventListener("click", (e) => {
     hideSuggestion();
   }
 });
+document.getElementById("correct-last-word").addEventListener("click", correctLastWord);
 
 // Drawing Pad Events
 drawingPad.addEventListener("mousedown", startDrawing);
@@ -162,6 +163,7 @@ async function sendDrawingToServer() {
         "success"
       );
       clearDrawing();
+      
     }, "image/png");
   } catch (error) {
     console.error("Prediction error:", error);
@@ -182,36 +184,46 @@ async function handleInput(e) {
   if (isProcessing) return;
 
   const insertedChar = e.data || '';
-  const isBoundary = isWordBoundary(insertedChar);
-
-  // Update word buffer
-  if (!isBoundary && insertedChar) {
-    currentWordBuffer += insertedChar;
-    return;
+  
+  // If space is pressed, process the last word
+  if (insertedChar === ' ') {
+    await processLastWord();
   }
+}
 
-  // Only process if we have a valid word
-  if (currentWordBuffer && currentWordBuffer !== lastProcessedWord) {
-    isProcessing = true;
-    updateStatus("Checking word", true);
+// New function to process the last word
+async function processLastWord() {
+  if (isProcessing) return;
+  
+  const text = editor.textContent || editor.innerText;
+  const words = text.trim().split(/\s+/);
+  const lastWord = words[words.length - 1];
+  
+  if (!lastWord || lastWord === lastProcessedWord) return;
+  
+  isProcessing = true;
+  updateStatus("Checking word", true);
+  
+  try {
+    console.log("Sending word to API:", lastWord);
+    const corrected = await window.electronAPI.correctWord(lastWord);
     
-    try {
-      console.log("Sending word to API:", currentWordBuffer);
-      const corrected = await window.electronAPI.correctWord(currentWordBuffer);
-      
-      if (corrected && corrected !== currentWordBuffer) {
-        showSuggestion(currentWordBuffer, corrected);
-        updateStatus("Suggestion available", false, "success");
-      }
-    } catch (error) {
-      console.error("API Error:", error);
-      updateStatus("Correction failed", false, "error");
-    } finally {
-      isProcessing = false;
-      lastProcessedWord = currentWordBuffer;
-      currentWordBuffer = "";
+    if (corrected && corrected !== lastWord) {
+      showSuggestion(lastWord, corrected);
+      updateStatus("Suggestion available", false, "success");
     }
+  } catch (error) {
+    console.error("API Error:", error);
+    updateStatus("Correction failed", false, "error");
+  } finally {
+    isProcessing = false;
+    lastProcessedWord = lastWord;
   }
+}
+
+// Function to manually correct last word
+async function correctLastWord() {
+  await processLastWord();
 }
 
 // Handle key events
@@ -306,25 +318,83 @@ function applyCorrection(original, corrected) {
     // Delete the original content
     newRange.deleteContents();
     
-    // Insert the corrected text
-    const textNode = document.createTextNode(corrected);
+    // Insert the corrected text followed by a space
+    const textNode = document.createTextNode(corrected + ' ');
     newRange.insertNode(textNode);
     
-    // Move cursor to end of corrected word
+    // Move cursor to end of corrected word (after the space)
     selection.removeAllRanges();
     const newCursorPos = document.createRange();
     newCursorPos.setStartAfter(textNode);
     newCursorPos.collapse(true);
     selection.addRange(newCursorPos);
   } else {
-    // Fallback - find and replace all instances (less ideal)
-    const editorContent = editor.innerHTML;
-    const updatedContent = editorContent.replace(
-      new RegExp(escapeRegExp(original), 'g'), 
-      corrected
-    );
-    editor.innerHTML = updatedContent;
+    // Fallback - find and replace the last instance (better for end-of-text cases)
+    const text = editor.textContent || editor.innerText;
+    const lastIndex = text.lastIndexOf(original);
+    
+    if (lastIndex !== -1) {
+      const before = text.substring(0, lastIndex);
+      const after = text.substring(lastIndex + original.length);
+      editor.textContent = before + corrected + ' ' + after;
+      
+      // Move cursor to end of correction
+      const newCursorPos = lastIndex + corrected.length + 1;
+      setCaretPosition(editor, newCursorPos);
+    } else {
+      // Final fallback - replace all instances
+      const editorContent = editor.innerHTML;
+      const updatedContent = editorContent.replace(
+        new RegExp(escapeRegExp(original), 'g'),
+        corrected + ' '
+      );
+      editor.innerHTML = updatedContent;
+    }
   }
+}
+
+// Helper function to set caret position
+function setCaretPosition(element, offset) {
+  const range = document.createRange();
+  const selection = window.getSelection();
+  
+  // Find the text node at the given offset
+  let pos = 0;
+  const textNodes = getTextNodes(element);
+  let targetNode = textNodes[0];
+  let targetOffset = offset;
+  
+  for (const node of textNodes) {
+    if (pos + node.length >= offset) {
+      targetNode = node;
+      targetOffset = offset - pos;
+      break;
+    }
+    pos += node.length;
+  }
+  
+  range.setStart(targetNode, Math.min(targetOffset, targetNode.length));
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+// Helper to get all text nodes
+function getTextNodes(element) {
+  const textNodes = [];
+  const walker = document.createTreeWalker(
+    element, 
+    NodeFilter.SHOW_TEXT, 
+    null, 
+    false
+  );
+  
+  let node;
+  while (node = walker.nextNode()) {
+    textNodes.push(node);
+  }
+  
+  return textNodes;
 }
 
 // Helper function to escape special regex characters
