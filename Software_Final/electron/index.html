@@ -4,17 +4,17 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="stylesheet" href="style/styles.css" />
-    <title>Smart Bilingual Editor</title>
+    <title>NavaSense</title>
   </head>
   <body>
     <div id="app-container">
-      <!-- Drawing Pad -->
-      <div id="drawing-container">
-        <canvas id="drawing-pad" width="300" height="300"></canvas>
-        <div class="drawing-controls">
-          <button id="clear-drawing">Clear Drawing</button>
-          <button id="send-drawing">Insert Character</button>
-        </div>
+      <!-- Collection Controls -->
+      <div class="collection-controls">
+        <button id="collection-btn" class="control-button start">
+          <span class="button-icon">▶</span>
+          <span class="button-text">Start Collection</span>
+        </button>
+        
       </div>
 
       <!-- Writing Toolbar -->
@@ -227,5 +227,6 @@
     <!-- Suggestion Box -->
     <div id="suggestion" class="suggestion"></div>
     <script src="js/script.js"></script>
+    <script src="js/api.js"></script>
   </body>
 </html>

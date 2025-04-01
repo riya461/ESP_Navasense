@@ -297,3 +297,61 @@ body {
     width: 20px;
     animation: dots 1.5s steps(5, end) infinite;
 }
+
+
+  #collection-btn.start {
+    background-color: #4CAF50;
+    color: white;
+  }
+  
+  #collection-btn.stop {
+    background-color: #f44336;
+    color: white;
+  }
+
+  .collection-controls {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+  }
+  
+  .control-button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+  
+  .control-button.start {
+    background-color: #4CAF50;
+    color: white;
+  }
+  
+  .control-button.stop {
+    background-color: #f44336;
+    color: white;
+  }
+  
+  .status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 14px;
+  }
+  
+  .status-light {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background-color: #ccc;
+  }
+  
+  .status-light.active {
+    background-color: #4CAF50;
+    box-shadow: 0 0 5px #4CAF50;
+  }
