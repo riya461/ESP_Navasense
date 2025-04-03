@@ -1,121 +1,101 @@
 from flask import Flask, request, jsonify
-import os
-import tempfile
-import random
-from datetime import datetime
 import time
-import threading
+import json
+import random
 
 app = Flask(__name__)
 
-# Global variables for data collection
+# Global Variables
+data_file_path = None
 is_collecting = False
-collected_data = []
-collection_thread = None
-stop_event = threading.Event()
+file_handle = None  # File handle for writing
 
-def data_collection_worker():
-    """Worker thread that continuously writes 'hello' to file"""
-    global collected_data
-    
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = f"imu_data_{timestamp}.txt"
-    filepath = os.path.join(tempfile.gettempdir(), filename)
-    
-    with open(filepath, 'w') as f:
-        while not stop_event.is_set():
-            # Write "hello" to file
-            f.write("hello\n")
-            f.flush()  # Ensure immediate write to file
-            os.fsync(f.fileno())  # Force write to disk
-            
-            # Store the data point (just for tracking)
-            collected_data.append({
-                'timestamp': datetime.now().isoformat(),
-                'value': 'hello'
-            })
-            
-            # Simulate sensor sampling rate (e.g., 10Hz = 100ms delay)
-            time.sleep(0.1)
 
-@app.route('/start', methods=['POST'])
+@app.route("/start", methods=["POST"])
 def start_collection():
-    global is_collecting, collection_thread, stop_event, collected_data
-    
+    """Start collecting IMU data and write to a file."""
+    global is_collecting, data_file_path, file_handle
+
     if is_collecting:
-        return jsonify({'status': 'already_running', 'message': 'Collection already in progress'})
-    
-    # Reset the stop event and clear data
-    stop_event.clear()
-    collected_data = []
-    
-    # Start the collection thread
-    collection_thread = threading.Thread(target=data_collection_worker)
-    collection_thread.daemon = True
-    collection_thread.start()
-    
+        return jsonify({"error": "Already collecting data"}), 400
+
+    timestamp = int(time.time())
+    data_file_path = f"imu_data_{timestamp}.json"
     is_collecting = True
-    
-    return jsonify({
-        'status': 'started',
-        'message': 'Data collection started - writing to file',
-        'timestamp': datetime.now().isoformat()
-    })
 
-@app.route('/stop', methods=['POST'])
+    # Open file in write mode and start JSON array
+    file_handle = open(data_file_path, "w")
+    file_handle.write("[\n")
+
+    return jsonify({"status": "started", "file": data_file_path})
+
+
+@app.route("/stop", methods=["POST"])
 def stop_collection():
-    global is_collecting, collection_thread, stop_event
-    
+    """Stop data collection, finalize file, and run prediction."""
+    global is_collecting, data_file_path, file_handle
+
     if not is_collecting:
-        return jsonify({'error': 'not_running', 'message': 'Collection not started'}), 400
-    
-    # Signal the thread to stop
-    stop_event.set()
-    
-    # Wait for thread to finish (with timeout)
-    if collection_thread is not None:
-        collection_thread.join(timeout=1.0)
-    
+        return jsonify({"error": "No active collection"}), 400
+
     is_collecting = False
-    
-    # Here you would normally send the data to your model
-    
-    # Create list of possible characters (English and Malayalam)
-    english_chars = list('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz')
-    malayalam_chars = [
-        'അ', 'ആ', 'ഇ', 'ഈ', 'ഉ', 'ഊ', 'ഋ', 'എ', 'ഏ', 'ഐ', 
-        'ഒ', 'ഓ', 'ഔ', 'ക', 'ഖ', 'ഗ', 'ഘ', 'ങ', 'ച', 'ഛ',
-        'ജ', 'ഝ', 'ഞ', 'ട', 'ഠ', 'ഡ', 'ഢ', 'ണ', 'ത', 'ഥ',
-        'ദ', 'ധ', 'ന', 'പ', 'ഫ', 'ബ', 'ഭ', 'മ', 'യ', 'ര',
-        'ല', 'വ', 'ശ', 'ഷ', 'സ', 'ഹ', 'ള', 'ഴ', 'റ'
-    ]
-    
-    # Combine both character sets
-    all_chars = english_chars + malayalam_chars
-    
-    # Select a random character
-    predicted_char = random.choice(all_chars)
-    
-    # Generate a random confidence score between 70-100%
-    confidence = round(random.uniform(0.7, 1.0), 2)
-    
-    return jsonify({
-        'status': 'stopped',
-        'character': predicted_char,
-        'confidence': confidence,
-        'message': 'Prediction complete',
-        'data_points': len(collected_data),
-        'note': 'Data was written to file but not processed by model'
-    })
 
-@app.route('/status', methods=['GET'])
+    # Close JSON array and file
+    if file_handle:
+        file_handle.seek(file_handle.tell() - 2)  # Remove last comma
+        file_handle.write("\n]\n")
+        file_handle.close()
+        file_handle = None
+
+    # Run prediction
+    predicted_char, confidence = run_prediction(data_file_path)
+
+    return jsonify(
+        {
+            "status": "stopped",
+            "character": predicted_char,
+            "confidence": confidence,
+            "file_path": data_file_path,
+        }
+    )
+
+
+@app.route("/imu", methods=["POST"])
+def receive_imu_data():
+    """Receive IMU data from ESP32 and store it in a file."""
+    global is_collecting, file_handle
+
+    if not is_collecting or file_handle is None:
+        return jsonify({"error": "Data collection is not active"}), 400
+
+    try:
+        imu_data = request.json  # Parse incoming JSON
+        json.dump(imu_data, file_handle)
+        file_handle.write(",\n")  # Separate entries with commas
+        return jsonify({"status": "data received"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+def run_prediction(file_path):
+    """Simulate running predictions using a model."""
+    predictions = {
+        "A": random.uniform(0.7, 0.99),
+        "B": random.uniform(0.6, 0.95),
+        "C": random.uniform(0.5, 0.9),
+    }
+
+    best_character = max(predictions, key=predictions.get)
+    confidence = predictions[best_character]
+
+    return best_character, confidence
+
+
+@app.route("/status", methods=["GET"])
 def collection_status():
-    return jsonify({
-        'is_collecting': is_collecting,
-        'data_points': len(collected_data),
-        'last_sample': collected_data[-1] if collected_data else None,
-        'message': 'Writing "hello" to file continuously' if is_collecting else 'Idle'
-    })
+    """Check if data collection is active."""
+    return jsonify({"is_collecting": is_collecting, "file": data_file_path})
 
-if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=5000, debug=True)
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=True)
