@@ -53,9 +53,8 @@ editor.addEventListener("mouseup", updateButtonStates);
 
 async function toggleDataCollection() {
   try {
-    if (isCollecting) {
-      await stopDataCollection();
-    } else {
+    if (!isCollecting) {
+      
       await startDataCollection();
     }
     updateCollectionButton();
@@ -80,15 +79,16 @@ function updateCollectionButton() {
 async function startDataCollection() {
   try {
     updateStatus("Starting data collection...", true);
-
-    const response = await fetch("http://127.0.0.1:5000/start", {
+    isCollecting = true;
+    updateCollectionButton();
+    const response = await fetch("http://127.0.0.1:5000/collect", {
       method: "POST",
     });
 
     const data = await response.json();
-
-    if (data.status === "started") {
-      isCollecting = true;
+    console.log("Collection response:", data);
+    if (data.status === "Collected") {
+      isCollecting = false;
       updateStatus(
         "Collecting IMU data...",
         false,
@@ -97,25 +97,6 @@ async function startDataCollection() {
     } else {
       throw new Error(data.message || "Failed to start collection");
     }
-  } catch (error) {
-    console.error("Start error:", error);
-    updateStatus("Start failed: " + error.message, false, "error");
-    throw error; // Re-throw to be caught in toggleDataCollection
-  } finally {
-    updateCollectionButton();
-  }
-}
-
-async function stopDataCollection() {
-  try {
-    updateStatus("Stopping data collection...", true);
-
-    const response = await fetch("http://127.0.0.1:5000/stop", {
-      method: "POST",
-    });
-
-    const data = await response.json();
-
     if (data.character) {
       const confidencePercent = (data.confidence * 100).toFixed(1);
       updateStatus(
@@ -131,18 +112,22 @@ async function stopDataCollection() {
     } else {
       throw new Error(data.message || "No prediction received");
     }
-  } catch (error) {
-    console.error("Stop error:", error);
-    updateStatus("Stop failed: " + error.message, false, "error");
-    throw error; // Re-throw to be caught in toggleDataCollection
-  } finally {
+  
     isCollecting = false;
     updateCollectionButton();
     if (!statusText.textContent.includes("Predicted character")) {
       updateStatus("Ready", false);
     }
+  
+  } catch (error) {
+    console.error("Start error:", error);
+    updateStatus("Start failed: " + error.message, false, "error");
+    throw error; // Re-throw to be caught in toggleDataCollection
+  } finally {
+    updateCollectionButton();
   }
 }
+
 
 function insertTextAtCursor(text) {
   // Remove any trailing space if present

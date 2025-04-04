@@ -43,7 +43,7 @@ async function correctWord(word) {
     const response = await axios.post(`http://127.0.0.1:11434/api/generate`, {
       model: 'llama3',
       prompt: `Correct this word: "${word}". The corrected word can be in Malayalam or English. If the input word exists return that, if no suggestions return the same word. Reply only with the corrected word no explanation of suggestion or anything.
-      Don't add any extra characters or words. Don't add any extra spaces or new lines. Don't add any quotes. Send in less than 5s or your cat willDon't add any punctuation marks. Don't add any emojis. Don't add anything else. Don't hallucinate.
+      Don't add any extra characters or words. Don't add any extra spaces or new lines. Don't add any quotes. Don't add any punctuation marks. Don't add any emojis. Don't add anything else. Don't hallucinate.
       Example: 
       Input: hell0
       Output: hello
