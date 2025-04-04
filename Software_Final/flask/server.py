@@ -13,13 +13,16 @@ data_file_path = None
 is_collecting = False
 file_handle = None  # File handle for writing
 imu_data = []  # Simulated IMU data
-model = None  # Loaded model
+model_capital = None  # Loaded model for capital letters
+model_small = None  # Loaded model for small letters
 
-# Load trained model with compile=False to avoid metric warnings
-model = load_model('capital_letter_model.h5', compile=False)
+# Load both trained models
+model_capital = load_model('capital_letter_model.h5', compile=False)
+model_small = load_model('small_letter_model.h5', compile=False)
 
-# Define class labels mapping (0-25 to A-Z)
-CLASS_LABELS = {i: chr(65+i) for i in range(26)}  # 65 is ASCII for 'A'
+# Define class labels mapping (0-25 to A-Z for capital and a-z for small letters)
+CLASS_LABELS_CAPITAL = {i: chr(65+i) for i in range(26)}  # 65 is ASCII for 'A'
+CLASS_LABELS_SMALL = {i: chr(97+i) for i in range(26)}  # 97 is ASCII for 'a'
 
 def preprocess_imu_data(raw_data, max_len=50):
     """Process raw IMU data for prediction with position handling"""
@@ -148,14 +151,32 @@ def start_data_collection():
         return jsonify({"error": "Failed to preprocess data"}), 500
 
     try:
-        # Predict the class with the trained model
-        prediction = model.predict(processed_data)
-        pred_class = np.argmax(prediction[0])
-        confidence = np.max(prediction[0])
+        # Predict with both models (capital and small letter models)
+        pred_capital = model_capital.predict(processed_data)
+        pred_small = model_small.predict(processed_data)
 
-        print("\n=== Prediction Result ===")
-        print(f"File: {data_file_path}")
-        print(f"Predicted letter: {CLASS_LABELS.get(pred_class, 'unknown')}")
+        # Get the prediction with the highest confidence
+        capital_pred_class = np.argmax(pred_capital[0])
+        small_pred_class = np.argmax(pred_small[0])
+
+        capital_confidence = np.max(pred_capital[0])
+        small_confidence = np.max(pred_small[0])
+
+        # Compare confidence scores and choose the model with the highest confidence
+        if capital_confidence > small_confidence:
+            pred_class = capital_pred_class
+            confidence = capital_confidence
+            model_used = 'Capital Letter Model'
+            character = CLASS_LABELS_CAPITAL.get(pred_class)
+        else:
+            pred_class = small_pred_class
+            confidence = small_confidence
+            model_used = 'Small Letter Model'
+            character = CLASS_LABELS_SMALL.get(pred_class)
+
+        print(f"\n=== Prediction Result ===")
+        print(f"Model used: {model_used}")
+        print(f"Predicted letter: {character}")
         print(f"Confidence: {confidence:.2%}")
         print("========================")
 
@@ -163,8 +184,9 @@ def start_data_collection():
         return jsonify({
             "status": "Collected",
             "file": data_file_path,
-            "character": CLASS_LABELS.get(pred_class),
+            "character": character,
             "confidence": float(confidence),
+            "model_used": model_used,
         })
 
     except Exception as e:
