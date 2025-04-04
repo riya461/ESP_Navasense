@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+import requests
 import time
 import json
 import random
@@ -15,7 +16,7 @@ file_handle = None  # File handle for writing
 imu_data = []  # Simulated IMU data
 model_capital = None  # Loaded model for capital letters
 model_small = None  # Loaded model for small letters
-
+sensor_url = 'http://192.168.68.118/motion'  
 # Load both trained models
 model_capital = load_model('capital_letter_model.h5', compile=False)
 model_small = load_model('small_letter_model.h5', compile=False)
@@ -66,26 +67,38 @@ def preprocess_imu_data(raw_data, max_len=50):
     except Exception as e:
         print(f"Error during preprocessing: {str(e)}")
         return None
-
 def simulate_imu_data():
-    """Simulate IMU data collection (e.g., accelerometer and gyroscope readings)."""
-    return {
-        "accelerometer": [random.uniform(-1, 1), random.uniform(-1, 1), random.uniform(-1, 1)],
-        "gyroscope": [random.uniform(-180, 180), random.uniform(-180, 180), random.uniform(-180, 180)],
-    }
+    """Simulate fetching IMU data from the ESP8266 sensor."""
+    try:
+        response = requests.get(sensor_url)
+        if response.status_code == 200:
+            print("Raw Response:\n", response.text)  # Print raw response for debugging
+            data = response.text  # This should now correctly parse the JSON
+            print(f"Data received from sensor: {data}")
+            return data
+        else:
+            print("Error: Could not retrieve data from the sensor.")
+            return None
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching data from sensor: {e}")
+        return None
+    except ValueError as e:
+        print(f"Error parsing JSON response: {e}")
+        return None
+
 
 def save_imu_data_to_file(file_handle):
-    """Simulate collecting and writing IMU data into the file."""
-    start_time = time.time()
-    while time.time() - start_time < 5:
-        imu = simulate_imu_data()
+    """Collect data for 5 seconds and store it into a file."""
+    imu = simulate_imu_data()
+        # Write the data in imu as imu_data.txt her e
+    if imu:
+        # Append the IMU data to the list
         imu_data.append(imu)
-        # Write each IMU data in the format: Acc x, Acc y, Acc z, Gyr x, Gyr y, Gyr z
-        file_handle.write(
-            f"{imu['accelerometer'][0]},{imu['accelerometer'][1]},{imu['accelerometer'][2]}," +
-            f"{imu['gyroscope'][0]},{imu['gyroscope'][1]},{imu['gyroscope'][2]}\n"
-        )
-        time.sleep(0.1)  # Simulating data collection interval
+        # Write the data to the file
+        file_handle.write(f"{imu}\n")
+    else:
+        print("No data received from sensor.")
+    time.sleep(0.1)  # Simulating data collection interval
 
 
 @app.route("/status", methods=["GET"])
@@ -102,7 +115,7 @@ def start_data_collection():
     # Start data collection
     is_collecting = True
     imu_data = []  # Reset IMU data
-    data_file_path = "A_caps.txt"
+    data_file_path = "imu_data.txt"
     file_handle = open(data_file_path, "w")
 
     # Collect data for 5 seconds
@@ -163,16 +176,21 @@ def start_data_collection():
         small_confidence = np.max(pred_small[0])
 
         # Compare confidence scores and choose the model with the highest confidence
-        if capital_confidence > small_confidence:
+        if (capital_confidence  > small_confidence and CLASS_LABELS_CAPITAL.get(capital_pred_class) != None):
             pred_class = capital_pred_class
             confidence = capital_confidence
             model_used = 'Capital Letter Model'
             character = CLASS_LABELS_CAPITAL.get(pred_class)
-        else:
+        elif (small_confidence  > capital_confidence) and CLASS_LABELS_CAPITAL.get(small_pred_class) != None:
             pred_class = small_pred_class
             confidence = small_confidence
             model_used = 'Small Letter Model'
             character = CLASS_LABELS_SMALL.get(pred_class)
+        else:
+            pred_class = 'Dot'
+            confidence = 0.0
+            model_used = 'Dot'
+            character = '.'
 
         print(f"\n=== Prediction Result ===")
         print(f"Model used: {model_used}")
