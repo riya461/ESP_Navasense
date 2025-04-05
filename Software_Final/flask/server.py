@@ -16,7 +16,10 @@ file_handle = None  # File handle for writing
 imu_data = []  # Simulated IMU data
 model_capital = None  # Loaded model for capital letters
 model_small = None  # Loaded model for small letters
+# for the ESP32 
 sensor_url = 'http://192.168.68.118/motion'  
+# for the ESP8266
+sensor_url = 'http://192.168.226.171/motion'  
 # Load both trained models
 model_capital = load_model('capital_letter_model.h5', compile=False)
 model_small = load_model('small_letter_model.h5', compile=False)

@@ -1,23 +1,4 @@
 
-
-void loop() {
-    int16_t ax_raw, ay_raw, az_raw;
-    int16_t gx_raw, gy_raw, gz_raw;
-
-    mpu.getAcceleration(&ax_raw, &ay_raw, &az_raw);
-    mpu.getRotation(&gx_raw, &gy_raw, &gz_raw);
-
-    ax = ax_raw / 16384.0;
-    ay = ay_raw / 16384.0;
-    az = az_raw / 16384.0;
-    gx = gx_raw / 131.0;
-    gy = gy_raw / 131.0;
-    gz = gz_raw / 131.0;
-
-    server.handleClient();
-}
-
-
 #include <Wire.h>
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
