@@ -1,12 +1,13 @@
 #include <Wire.h>
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
-#include <WiFi.h>
-#include <WebServer.h>
+
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
 #include <HTTPClient.h>
 
 Adafruit_MPU6050 mpu;
-WebServer server(80);
+ESP8266WebServer server(80);
 
 const char* ssid = "Uio";
 const char* password = "0nnm7q8h";
