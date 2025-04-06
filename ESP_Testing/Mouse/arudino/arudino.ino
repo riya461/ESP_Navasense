@@ -1,48 +1,103 @@
-#include <BleMouse.h>
+#include <Wire.h>
 #include <Adafruit_MPU6050.h>
-
-#define SPEED 8
+#include <Adafruit_Sensor.h>
+#include <ESP8266WiFi.h>
+#include <ESP8266WebServer.h>
 
 Adafruit_MPU6050 mpu;
-BleMouse bleMouse;
+ESP8266WebServer server(80);
 
-bool sleepMPU = true;
-long mpuDelayMillis;
+const char* ssid = "SSID";
+const char* password = "PASSWORD";
+
+// Motion Data Variables
+float ax, ay, az;
+float gx, gy, gz;
+
+bool collectingData = false;
+unsigned long startTime = 0;
+String collectedData = "";  // Store collected data in a string
+
 
 void setup() {
   Serial.begin(115200);
-  bleMouse.begin();
-  delay(1000);
-  
+  Wire.begin();
+
   if (!mpu.begin()) {
-    Serial.println("Failed to find MPU6050 chip");
-    while (1) {
-      delay(10);
-    }
+    Serial.println("MPU6050 connection failed!");
+    while (1);
   }
-  Serial.println("MPU6050 Found!");
-  mpu.enableSleep(sleepMPU);
+  Serial.println("MPU6050 connected!");
+  
+  //setupt motion detection
+  mpu.setHighPassFilter(MPU6050_HIGHPASS_0_63_HZ);
+  mpu.setMotionDetectionThreshold(1);
+  mpu.setMotionDetectionDuration(20);
+  mpu.setInterruptPinLatch(true);	// Keep it latched.  Will turn off when reinitialized.
+  mpu.setInterruptPinPolarity(true);
+  mpu.setMotionInterrupt(true);
+
+  // Connect to WiFi
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(1000);
+    Serial.print(".");
+  }
+  Serial.println("\nConnected to WiFi!");
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
+
+  // Web Page Route
+  server.on("/", HTTP_GET, []() {
+    String html = "<!DOCTYPE html><html><head>";
+    html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
+    html += "<link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css'>";
+    html += "<title>MPU6050 Dashboard</title></head><body class='container mt-3'>";
+    html += "</div></div>";
+    html += "</body></html>";
+    server.send(200, "text/html", html);
+  });
+
+  // JSON Data Endpoint
+  server.on("/motion", HTTP_GET, handleMotionRequest);
+
+  server.begin();
 }
 
 void loop() {
-  if (bleMouse.isConnected()) {
-    if (sleepMPU) {
-      delay(3000);
-      Serial.println("MPU6050 awakened!");
-      sleepMPU = false;
-      mpu.enableSleep(sleepMPU);
-      delay(500);
-    }
+  server.handleClient();
+}
 
+// Function to simulate data collection and store it as a text file
+void collectDataForFiveSeconds() {
+  collectedData = "";  // Reset collected data
+  unsigned long start = millis();
+  while (millis() - start < 7000) {
+    if(mpu.getMotionInterruptStatus()) {
     sensors_event_t a, g, temp;
     mpu.getEvent(&a, &g, &temp);
 
-    // For 90-degree rotated MPU6050:
-    // - Swap X and Z axes for movement
-    // - Invert one axis to maintain natural movement direction
-    bleMouse.move(g.gyro.z * SPEED, g.gyro.x * SPEED);
 
-    // Alternative mapping if the above doesn't feel natural:
-    // bleMouse.move(g.gyro.z * -SPEED, g.gyro.y * SPEED);
+    // Append collected data to the string
+    collectedData += String(a.acceleration.x) + "," + String(a.acceleration.y) + "," + String(a.acceleration.z) + "," +
+                     String(g.gyro.x) + "," + String(g.gyro.y) + "," + String(g.gyro.z) + ","  + "\n";
+    }
+    delay(1);  // Simulating delay between data points
   }
+}
+void handleMotionRequest() {
+  
+
+  collectingData = true;
+  collectDataForFiveSeconds();
+  collectingData = false;
+
+  // Format the collected data as JSON
+  String response = collectedData;
+  Serial.println(collectedData);
+
+  // Send the collected data as JSON
+  server.sendHeader("Content-Type", "application/json");
+  server.send(200, "application/json", response);  // Send data as JSON
 }

@@ -4,8 +4,12 @@ import time
 import json
 import random
 import numpy as np
+import os
+os.environ["TF_ENABLE_ONEDNN_OPTS"] = '0'
+
 import tensorflow as tf
 from tensorflow.keras.models import load_model
+
 
 app = Flask(__name__)
 
@@ -17,16 +21,19 @@ imu_data = []  # Simulated IMU data
 model_capital = None  # Loaded model for capital letters
 model_small = None  # Loaded model for small letters
 # for the ESP32 
-sensor_url = 'http://192.168.68.118/motion'  
+# sensor_url = 'http://192.168.226.150/motion'  
 # for the ESP8266
 sensor_url = 'http://192.168.226.171/motion'  
 # Load both trained models
 model_capital = load_model('capital_letter_model.h5', compile=False)
 model_small = load_model('small_letter_model.h5', compile=False)
+# model_malayalam = load_model('malayalam_model.h5', compile=False)
+
 
 # Define class labels mapping (0-25 to A-Z for capital and a-z for small letters)
 CLASS_LABELS_CAPITAL = {i: chr(65+i) for i in range(26)}  # 65 is ASCII for 'A'
 CLASS_LABELS_SMALL = {i: chr(97+i) for i in range(26)}  # 97 is ASCII for 'a'
+# CLASS_LABELS_MALAYALAM = {i: chr(0x0D00 + i) for i in range(0, 52)}  # Malayalam Unicode range
 
 def preprocess_imu_data(raw_data, max_len=50):
     """Process raw IMU data for prediction with position handling"""
@@ -93,6 +100,7 @@ def simulate_imu_data():
 def save_imu_data_to_file(file_handle):
     """Collect data for 5 seconds and store it into a file."""
     imu = simulate_imu_data()
+    print(f"IMU data: {imu}")  # Print the IMU data for debugging
         # Write the data in imu as imu_data.txt her e
     if imu:
         # Append the IMU data to the list
@@ -118,6 +126,7 @@ def start_data_collection():
     # Start data collection
     is_collecting = True
     imu_data = []  # Reset IMU data
+    print("Starting data collection...")
     data_file_path = "imu_data.txt"
     file_handle = open(data_file_path, "w")
 
@@ -170,25 +179,40 @@ def start_data_collection():
         # Predict with both models (capital and small letter models)
         pred_capital = model_capital.predict(processed_data)
         pred_small = model_small.predict(processed_data)
+        # pred_malayalam = model_malayalam.predict(processed_data)
 
         # Get the prediction with the highest confidence
         capital_pred_class = np.argmax(pred_capital[0])
         small_pred_class = np.argmax(pred_small[0])
+        # malayalam_pred_class = np.argmax(pred_malayalam[0])
+        malayalam_pred_class = None
 
         capital_confidence = np.max(pred_capital[0])
         small_confidence = np.max(pred_small[0])
+        # malayalam_confidence = np.max(pred_malayalam[0])
+        malayalam_confidence = 0.0
+        
+        #  print both predictions 
+        print(f"Capital Letter Prediction: {CLASS_LABELS_CAPITAL.get(capital_pred_class)} with confidence {capital_confidence:.2%}")
+        print(f"Small Letter Prediction: {CLASS_LABELS_SMALL.get(small_pred_class)} with confidence {small_confidence:.2%}")
+        # print(f"Malayalam Letter Prediction: {CLASS_LABELS_MALAYALAM.get(malayalam_pred_class)} with confidence {malayalam_confidence:.2%}")
 
         # Compare confidence scores and choose the model with the highest confidence
-        if (capital_confidence  > small_confidence and CLASS_LABELS_CAPITAL.get(capital_pred_class) != None):
+        if ((capital_confidence  > small_confidence and capital_confidence > malayalam_confidence) and CLASS_LABELS_CAPITAL.get(capital_pred_class) != None):
             pred_class = capital_pred_class
             confidence = capital_confidence
             model_used = 'Capital Letter Model'
             character = CLASS_LABELS_CAPITAL.get(pred_class)
-        elif (small_confidence  > capital_confidence) and CLASS_LABELS_CAPITAL.get(small_pred_class) != None:
+        elif (small_confidence  >= capital_confidence and small_confidence > malayalam_confidence) and CLASS_LABELS_CAPITAL.get(small_pred_class) != None:
             pred_class = small_pred_class
             confidence = small_confidence
             model_used = 'Small Letter Model'
             character = CLASS_LABELS_SMALL.get(pred_class)
+        elif (malayalam_confidence >= capital_confidence and malayalam_confidence > small_confidence) and CLASS_LABELS_CAPITAL.get(malayalam_pred_class) != None:
+            pred_class = malayalam_pred_class
+            confidence = malayalam_confidence
+            model_used = 'Malayalam Letter Model'
+            character = CLASS_LABELS_CAPITAL.get(pred_class)
         else:
             pred_class = 'Dot'
             confidence = 0.0
@@ -200,7 +224,9 @@ def start_data_collection():
         print(f"Predicted letter: {character}")
         print(f"Confidence: {confidence:.2%}")
         print("========================")
-
+        # remove the content in file
+        with open(data_file_path, 'w') as f:
+            f.write("")
         # Return the prediction as a JSON response
         return jsonify({
             "status": "Collected",

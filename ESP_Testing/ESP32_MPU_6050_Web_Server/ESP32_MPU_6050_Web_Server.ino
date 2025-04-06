@@ -14,8 +14,8 @@
 
 
 // Replace with your network credentials
-const char* ssid = "Astraa 1st Floor";
-const char* password = "Astraa123";
+const char* ssid = "SSID";
+const char* password = "PASSWORD";
 
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);

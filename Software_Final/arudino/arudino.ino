@@ -9,8 +9,8 @@
 Adafruit_MPU6050 mpu;
 WebServer server(80);
 
-const char* ssid = "Uio";
-const char* password = "0nnm7q8h";
+const char* ssid = "SSID";
+const char* password = "PASSWORD";
 
 // Motion Data Variables
 float ax, ay, az;
@@ -50,27 +50,7 @@ void setup() {
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
 
-  // Web Page Route
-  server.on("/", HTTP_GET, []() {
-    String html = "<!DOCTYPE html><html><head>";
-    html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
-    html += "<link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css'>";
-    html += "<title>MPU6050 Dashboard</title></head><body class='container mt-3'>";
-    html += "<h2 class='text-center'>MPU6050 Sensor Dashboard</h2>";
-    html += "<div class='card'><div class='card-body'>";
-    html += "<h5 class='card-title'>Live Sensor Readings</h5>";
-    html += "<p><strong>Accelerometer:</strong> <span id='accel'></span></p>";
-    html += "<p><strong>Gyroscope:</strong> <span id='gyro'></span></p>";
-    html += "</div></div>";
-    html += "<script>";
-    html += "setInterval(function() { fetch('/motion').then(response => response.json()).then(data => {";
-    html += "document.getElementById('accel').innerHTML = `Ax: ${data.ax}, Ay: ${data.ay}, Az: ${data.az}`;";
-    html += "document.getElementById('gyro').innerHTML = `Gx: ${data.gx}, Gy: ${data.gy}, Gz: ${data.gz}`;"; 
-    html += "}); }, 100);";  // Updates every 100ms
-    html += "</script></body></html>";
-    server.send(200, "text/html", html);
-  });
-
+  
   // JSON Data Endpoint
   server.on("/motion", HTTP_GET, handleMotionRequest);
 
@@ -95,7 +75,7 @@ void collectDataForFiveSeconds() {
     collectedData += String(a.acceleration.x) + "," + String(a.acceleration.y) + "," + String(a.acceleration.z) + "," +
                      String(g.gyro.x) + "," + String(g.gyro.y) + "," + String(g.gyro.z) + ","  + "\n";
     }
-    delay(1);  // Simulating delay between data points
+   // delay(1);  // Simulating delay between data points
   }
 }
 void handleMotionRequest() {

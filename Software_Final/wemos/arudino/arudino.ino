@@ -1,16 +1,14 @@
 #include <Wire.h>
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
-
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
-#include <HTTPClient.h>
 
 Adafruit_MPU6050 mpu;
 ESP8266WebServer server(80);
 
-const char* ssid = "Uio";
-const char* password = "0nnm7q8h";
+const char* ssid = "SSID";
+const char* password = "PASSWORD";
 
 // Motion Data Variables
 float ax, ay, az;
@@ -19,6 +17,9 @@ float gx, gy, gz;
 bool collectingData = false;
 unsigned long startTime = 0;
 String collectedData = "";  // Store collected data in a string
+
+unsigned long lastCollectTime = 0;
+const unsigned long collectInterval = 1000; // Collect data every 1 second
 
 
 void setup() {
@@ -31,11 +32,11 @@ void setup() {
   }
   Serial.println("MPU6050 connected!");
   
-  //setupt motion detection
+  // Setup motion detection
   mpu.setHighPassFilter(MPU6050_HIGHPASS_0_63_HZ);
   mpu.setMotionDetectionThreshold(1);
   mpu.setMotionDetectionDuration(20);
-  mpu.setInterruptPinLatch(true);	// Keep it latched.  Will turn off when reinitialized.
+  mpu.setInterruptPinLatch(true);  // Keep it latched. Will turn off when reinitialized.
   mpu.setInterruptPinPolarity(true);
   mpu.setMotionInterrupt(true);
 
@@ -56,17 +57,15 @@ void setup() {
     html += "<meta name='viewport' content='width=device-width, initial-scale=1'>";
     html += "<link rel='stylesheet' href='https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css'>";
     html += "<title>MPU6050 Dashboard</title></head><body class='container mt-3'>";
-    html += "<h2 class='text-center'>MPU6050 Sensor Dashboard</h2>";
+    html += "<h2 class='text-center'>MPU6050 Sensor is working</h2>";
     html += "<div class='card'><div class='card-body'>";
-    html += "<h5 class='card-title'>Live Sensor Readings</h5>";
-    html += "<p><strong>Accelerometer:</strong> <span id='accel'></span></p>";
-    html += "<p><strong>Gyroscope:</strong> <span id='gyro'></span></p>";
+    html += "<h5 class='card-title'> Sensor Readings</h5>";
+    
     html += "</div></div>";
     html += "<script>";
     html += "setInterval(function() { fetch('/motion').then(response => response.json()).then(data => {";
-    html += "document.getElementById('accel').innerHTML = `Ax: ${data.ax}, Ay: ${data.ay}, Az: ${data.az}`;";
-    html += "document.getElementById('gyro').innerHTML = `Gx: ${data.gx}, Gy: ${data.gy}, Gz: ${data.gz}`;"; 
-    html += "}); }, 100);";  // Updates every 100ms
+    html += "document.getElementById('accel').innerHTML = `Data: ${data.collectedData}`;"; 
+    html += "}); }, 500);";  // Updates every 500ms
     html += "</script></body></html>";
     server.send(200, "text/html", html);
   });
@@ -81,28 +80,31 @@ void loop() {
   server.handleClient();
 }
 
-// Function to simulate data collection and store it as a text file
+
 void collectDataForFiveSeconds() {
   collectedData = "";  // Reset collected data
   unsigned long start = millis();
-  while (millis() - start < 7000) {
-    if(mpu.getMotionInterruptStatus()) {
-    sensors_event_t a, g, temp;
-    mpu.getEvent(&a, &g, &temp);
+  
+  // Run for 5 seconds
+  while (millis() - start < 5000) {
+    if (millis() - lastCollectTime >= collectInterval) {
+      if (mpu.getMotionInterruptStatus()) {
+        sensors_event_t a, g, temp;
+        mpu.getEvent(&a, &g, &temp);
 
-
-    // Append collected data to the string
-    collectedData += String(a.acceleration.x) + "," + String(a.acceleration.y) + "," + String(a.acceleration.z) + "," +
-                     String(g.gyro.x) + "," + String(g.gyro.y) + "," + String(g.gyro.z) + ","  + "\n";
+        // Append collected data
+        collectedData += String(a.acceleration.x, 6) + "," + String(a.acceleration.y, 6) + "," + String(a.acceleration.z, 6) + "," +
+                         String(g.gyro.x, 6) + "," + String(g.gyro.y, 6) + "," + String(g.gyro.z, 6) + "\n";
+      }
+      lastCollectTime = millis();
     }
-    delay(1);  // Simulating delay between data points
+    yield();  // Allow other tasks (e.g., web server handling)
   }
 }
-void handleMotionRequest() {
-  
 
+void handleMotionRequest() {
   collectingData = true;
-  collectDataForFiveSeconds();
+  collectDataForFiveSeconds();  // Collect data for exactly 5 seconds
   collectingData = false;
 
   // Format the collected data as JSON
@@ -113,3 +115,4 @@ void handleMotionRequest() {
   server.sendHeader("Content-Type", "application/json");
   server.send(200, "application/json", response);  // Send data as JSON
 }
+

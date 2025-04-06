@@ -8,8 +8,8 @@ Adafruit_MPU6050 mpu;
 WebSocketsClient webSocket;
 
 // WiFi credentials
-const char* ssid = "Uio";
-const char* password = "0nnm7q8h";
+const char* ssid = "SSID";
+const char* password = "PASSWORD";
 
 // WebSocket server (your Electron app's IP)
 const char* websocketServer = "localhost"; 
