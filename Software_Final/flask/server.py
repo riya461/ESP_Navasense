@@ -18,24 +18,20 @@ data_file_path = None
 is_collecting = False
 file_handle = None  # File handle for writing
 imu_data = []  # Simulated IMU data
-model_capital = None  # Loaded model for capital letters
-model_small = None  # Loaded model for small letters
 # for the ESP32 
 # sensor_url = 'http://192.168.226.150/motion'  
 # for the ESP8266
 sensor_url = 'http://192.168.226.171/motion'  
 # Load both trained models
 model_capital = load_model('capital_letter_model.h5', compile=False)
-model_small = load_model('small_letter_model.h5', compile=False)
-# model_malayalam = load_model('malayalam_model.h5', compile=False)
+model_malayalam = load_model('malayalam_model.h5', compile=False)
 
 
 # Define class labels mapping (0-25 to A-Z for capital and a-z for small letters)
 CLASS_LABELS_CAPITAL = {i: chr(65+i) for i in range(26)}  # 65 is ASCII for 'A'
-CLASS_LABELS_SMALL = {i: chr(97+i) for i in range(26)}  # 97 is ASCII for 'a'
-# CLASS_LABELS_MALAYALAM = {i: chr(0x0D00 + i) for i in range(0, 52)}  # Malayalam Unicode range
+CLASS_LABELS_MALAYALAM = ['‍ാ', 'ട',  'ല','മ','ഠ', 'ള', 'പ',  'യ','ഴ' ]  # Malayalam Unicode range
 
-def preprocess_imu_data(raw_data, max_len=50):
+def preprocess_imu_data_english(raw_data, max_len=50):
     """Process raw IMU data for prediction with position handling"""
     try:
         data = np.array(raw_data, dtype=np.float32)
@@ -80,6 +76,7 @@ def preprocess_imu_data(raw_data, max_len=50):
 def simulate_imu_data():
     """Simulate fetching IMU data from the ESP8266 sensor."""
     try:
+        print(f"Fetching data from sensor at {sensor_url}...")
         response = requests.get(sensor_url)
         if response.status_code == 200:
             print("Raw Response:\n", response.text)  # Print raw response for debugging
@@ -126,6 +123,7 @@ def start_data_collection():
     # Start data collection
     is_collecting = True
     imu_data = []  # Reset IMU data
+
     print("Starting data collection...")
     data_file_path = "imu_data.txt"
     file_handle = open(data_file_path, "w")
@@ -171,44 +169,40 @@ def start_data_collection():
     print(f"Successfully read {len(numeric_data)} data points")
 
     # Preprocess the IMU data for prediction
-    processed_data = preprocess_imu_data(numeric_data)
-    if processed_data is None:
-        return jsonify({"error": "Failed to preprocess data"}), 500
+    processed_english_data = preprocess_imu_data_english(numeric_data)
+    if processed_english_data is None:
+        return jsonify({"error": "Failed to preprocess english data"})
+    print(f"Processed data shape: {processed_english_data.shape}")
 
+    processed_malayalam_data = preprocess_imu_data_malayalam(numeric_data)
+    if processed_malayalam_data is None:
+        return jsonify({"error": "Failed to preprocess malayalam data"})
+    print(f"Processed data shape: {processed_malayalam_data.shape}")
     try:
         # Predict with both models (capital and small letter models)
-        pred_capital = model_capital.predict(processed_data)
-        pred_small = model_small.predict(processed_data)
-        # pred_malayalam = model_malayalam.predict(processed_data)
+        pred_capital = model_capital.predict(processed_english_data)
+        pred_malayalam = model_malayalam.predict(processed_malayalam_data)
 
         # Get the prediction with the highest confidence
         capital_pred_class = np.argmax(pred_capital[0])
-        small_pred_class = np.argmax(pred_small[0])
-        # malayalam_pred_class = np.argmax(pred_malayalam[0])
-        malayalam_pred_class = None
+        malayalam_pred_class = np.argmax(pred_malayalam[0])
+      
 
         capital_confidence = np.max(pred_capital[0])
-        small_confidence = np.max(pred_small[0])
-        # malayalam_confidence = np.max(pred_malayalam[0])
-        malayalam_confidence = 0.0
+        malayalam_confidence = np.max(pred_malayalam[0])
+       
         
         #  print both predictions 
-        print(f"Capital Letter Prediction: {CLASS_LABELS_CAPITAL.get(capital_pred_class)} with confidence {capital_confidence:.2%}")
-        print(f"Small Letter Prediction: {CLASS_LABELS_SMALL.get(small_pred_class)} with confidence {small_confidence:.2%}")
-        # print(f"Malayalam Letter Prediction: {CLASS_LABELS_MALAYALAM.get(malayalam_pred_class)} with confidence {malayalam_confidence:.2%}")
+        # print(f"Capital Letter Prediction: {CLASS_LABELS_CAPITAL.get(capital_pred_class)} with confidence {capital_confidence:.2%}")
+        print(f"Malayalam Letter Prediction: {CLASS_LABELS_MALAYALAM.get(malayalam_pred_class)} with confidence {malayalam_confidence:.2%}")
 
         # Compare confidence scores and choose the model with the highest confidence
-        if ((capital_confidence  > small_confidence and capital_confidence > malayalam_confidence) and CLASS_LABELS_CAPITAL.get(capital_pred_class) != None):
+        if (( capital_confidence > malayalam_confidence) and CLASS_LABELS_CAPITAL.get(capital_pred_class) != None):
             pred_class = capital_pred_class
             confidence = capital_confidence
             model_used = 'Capital Letter Model'
             character = CLASS_LABELS_CAPITAL.get(pred_class)
-        elif (small_confidence  >= capital_confidence and small_confidence > malayalam_confidence) and CLASS_LABELS_CAPITAL.get(small_pred_class) != None:
-            pred_class = small_pred_class
-            confidence = small_confidence
-            model_used = 'Small Letter Model'
-            character = CLASS_LABELS_SMALL.get(pred_class)
-        elif (malayalam_confidence >= capital_confidence and malayalam_confidence > small_confidence) and CLASS_LABELS_CAPITAL.get(malayalam_pred_class) != None:
+        elif (malayalam_confidence >= capital_confidence ) and CLASS_LABELS_CAPITAL.get(malayalam_pred_class) != None:
             pred_class = malayalam_pred_class
             confidence = malayalam_confidence
             model_used = 'Malayalam Letter Model'
@@ -218,7 +212,7 @@ def start_data_collection():
             confidence = 0.0
             model_used = 'Dot'
             character = '.'
-
+        
         print(f"\n=== Prediction Result ===")
         print(f"Model used: {model_used}")
         print(f"Predicted letter: {character}")

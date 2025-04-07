@@ -41,7 +41,7 @@ async function correctWord(word) {
   console.log('Correcting word:', word);
   try {
     const response = await axios.post(`http://127.0.0.1:11434/api/generate`, {
-      model: 'llama3',
+      model: 'neural-chat',
       prompt: `Correct this word: "${word}". The corrected word can be in Malayalam or English. If the input word exists return that, if no suggestions return the same word. Reply only with the corrected word no explanation of suggestion or anything.
       Don't add any extra characters or words. Don't add any extra spaces or new lines. Don't add any quotes. Don't add any punctuation marks. Don't add any emojis. Don't add anything else. Don't hallucinate.
       Output should be same number of characters as the input do not add any more than that .
