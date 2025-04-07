@@ -8,7 +8,7 @@ Adafruit_MPU6050 mpu;
 ESP8266WebServer server(80);
 
 const char* ssid = "SSID";
-const char* password = "PASSWORD";
+const char* password = "PWD";
 
 // Motion Data Variables
 float ax, ay, az;
@@ -73,7 +73,7 @@ void loop() {
 void collectDataForFiveSeconds() {
   collectedData = "";  // Reset collected data
   unsigned long start = millis();
-  while (millis() - start < 7000) {
+  while (millis() - start < 4000) {
     if(mpu.getMotionInterruptStatus()) {
     sensors_event_t a, g, temp;
     mpu.getEvent(&a, &g, &temp);
